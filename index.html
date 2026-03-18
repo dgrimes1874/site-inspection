@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Site Inspection v2</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a1a;min-height:100vh;overflow-x:hidden;}
+.header{background:#1a1a1a;color:white;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
+.header h1{font-size:17px;font-weight:600;}
+.tab-bar{display:flex;background:white;border-bottom:1px solid #e5e5e5;position:sticky;top:49px;z-index:199;}
+.tab{flex:1;padding:11px 6px;text-align:center;font-size:13px;font-weight:500;color:#888;border-bottom:2px solid transparent;cursor:pointer;}
+.tab.active{color:#1a1a1a;border-bottom-color:#1a1a1a;}
+.screen{display:none;padding:14px;max-width:600px;margin:0 auto;padding-bottom:32px;}
+.screen.active{display:block;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 16px;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;white-space:nowrap;}
+.btn-dark{background:#1a1a1a;color:white;width:100%;}
+.btn-red{background:#e63946;color:white;}
+.btn-green{background:#2d6a4f;color:white;width:100%;}
+.btn-gray{background:#f0f0f0;color:#333;}
+.btn-outline{background:white;color:#1a1a1a;border:1.5px solid #1a1a1a;}
+.btn-sm{padding:8px 12px;font-size:13px;width:auto;}
+.btn-full{width:100%;}
+.card{background:white;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #e5e5e5;}
+.card-title{font-size:11px;font-weight:600;color:#888;letter-spacing:0.05em;margin-bottom:10px;}
+.area-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+.area-btn{background:white;border:1.5px solid #e5e5e5;border-radius:10px;padding:12px 8px;text-align:center;cursor:pointer;transition:all 0.15s;}
+.area-btn.selected{border-color:#1a1a1a;background:#f8f8f8;}
+.area-btn.done{border-color:#2d6a4f;background:#e8f5e9;}
+.area-btn .icon{font-size:22px;margin-bottom:4px;}
+.area-btn .label{font-size:12px;font-weight:500;}
+.area-btn .status{font-size:10px;color:#888;margin-top:2px;}
+.area-btn.done .status{color:#2d6a4f;}
+
+/* Camera */
+.camera-wrap{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:4/3;margin-bottom:10px;}
+#camera-video{width:100%;height:100%;object-fit:cover;}
+.camera-overlay{position:absolute;bottom:0;left:0;right:0;padding:12px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(transparent,rgba(0,0,0,0.6));}
+.shutter{width:56px;height:56px;border-radius:50%;background:white;border:3px solid rgba(255,255,255,0.5);cursor:pointer;transition:transform 0.1s;}
+.shutter:active{transform:scale(0.9);}
+.shutter.recording{background:#e63946;animation:rec-pulse 1s infinite;}
+@keyframes rec-pulse{0%,100%{opacity:1;}50%{opacity:0.6;}}
+.cam-toggle{background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.4);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;}
+.rec-indicator{position:absolute;top:10px;left:10px;background:#e63946;color:white;font-size:11px;font-weight:600;padding:3px 8px;border-radius:99px;display:none;align-items:center;gap:4px;}
+.rec-dot{width:6px;height:6px;border-radius:50%;background:white;animation:rec-pulse 1s infinite;}
+
+/* Media strip */
+.media-strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;-webkit-overflow-scrolling:touch;}
+.media-thumb{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;flex-shrink:0;cursor:pointer;border:2px solid transparent;}
+.media-thumb.selected{border-color:#1a1a1a;}
+.media-thumb img,.media-thumb video{width:100%;height:100%;object-fit:cover;}
+.media-thumb .type-badge{position:absolute;bottom:3px;left:3px;background:rgba(0,0,0,0.6);color:white;font-size:9px;padding:1px 5px;border-radius:4px;}
+.media-thumb .del{position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:white;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;}
+.media-thumb .has-voice{position:absolute;bottom:3px;right:3px;font-size:12px;}
+.media-thumb .has-drawing{position:absolute;top:2px;left:2px;font-size:12px;}
+
+/* Drawing canvas overlay */
+.draw-overlay{display:none;position:fixed;inset:0;z-index:300;background:#000;flex-direction:column;}
+.draw-overlay.active{display:flex;}
+.draw-header{background:#1a1a1a;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.draw-header h2{color:white;font-size:15px;font-weight:600;}
+.draw-tools{display:flex;gap:6px;align-items:center;}
+.tool-btn{width:36px;height:36px;border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;background:rgba(255,255,255,0.15);color:white;}
+.tool-btn.active{background:white;color:#1a1a1a;}
+.draw-canvas-wrap{flex:1;position:relative;overflow:hidden;}
+#draw-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;}
+#draw-canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
+.draw-bottom{background:#1a1a1a;padding:10px 14px;display:flex;gap:8px;}
+.color-btn{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;}
+.color-btn.active{border-color:white;}
+.stroke-slider{flex:1;accent-color:white;}
+
+/* Voice memo */
+.voice-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.voice-chip{background:#f0f0f0;border-radius:8px;padding:6px 10px;font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;}
+.voice-chip:active{background:#e0e0e0;}
+
+/* Measurement */
+textarea{width:100%;border:1px solid #e5e5e5;border-radius:8px;padding:10px;font-size:15px;font-family:inherit;resize:none;outline:none;line-height:1.5;}
+textarea:focus{border-color:#1a1a1a;}
+.ai-result{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px;margin-top:10px;}
+.ai-result-title{font-size:12px;font-weight:600;color:#166534;margin-bottom:8px;}
+.meas-table{width:100%;border-collapse:collapse;font-size:13px;}
+.meas-table th{text-align:left;padding:6px 4px;color:#888;font-weight:500;border-bottom:1px solid #e5e5e5;font-size:11px;}
+.meas-table td{padding:6px 4px;border-bottom:1px solid #f5f5f5;}
+.meas-table tr:last-child td{border-bottom:none;}
+.loading{display:flex;align-items:center;gap:10px;padding:14px;color:#888;font-size:14px;}
+.spinner{width:20px;height:20px;border:2px solid #e5e5e5;border-top-color:#1a1a1a;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.flag{background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:8px 10px;font-size:12px;color:#f57f17;margin-top:8px;}
+
+/* Areas + Worksheet */
+.area-item{background:white;border-radius:10px;border:1px solid #e5e5e5;margin-bottom:10px;overflow:hidden;}
+.area-item-hdr{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;}
+.ws-section{background:white;border-radius:12px;border:1px solid #e5e5e5;margin-bottom:10px;overflow:hidden;}
+.ws-hdr{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e5e5;}
+.ws-body{padding:12px 14px;}
+.toggle-row{display:flex;gap:8px;margin-top:10px;}
+.tog-btn{flex:1;padding:9px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1.5px solid #e5e5e5;background:white;color:#888;}
+.tog-btn.keep{border-color:#2d6a4f;background:#e8f5e9;color:#2d6a4f;}
+.tog-btn.remove{border-color:#e63946;background:#fee2e2;color:#e63946;}
+.empty-state{text-align:center;padding:48px 16px;color:#888;}
+.empty-state .icon{font-size:44px;margin-bottom:12px;}
+
+/* Misc */
+.section-label{font-size:11px;font-weight:600;color:#888;letter-spacing:0.05em;margin-bottom:8px;}
+.hint{font-size:12px;color:#888;text-align:center;margin-top:6px;}
+.divider{height:1px;background:#e5e5e5;margin:12px 0;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏠 Site Inspection</h1>
+  <span id="hdr-date" style="font-size:12px;color:#999;"></span>
+</div>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="showTab('capture')">Capture</div>
+  <div class="tab" onclick="showTab('areas')">Areas</div>
+  <div class="tab" onclick="showTab('worksheet')">Worksheet</div>
+</div>
+
+<!-- ═══ CAPTURE ═══ -->
+<div class="screen active" id="screen-capture">
+  <div class="section-label">SELECT AREA</div>
+  <div class="area-grid" id="area-grid"></div>
+
+  <div id="capture-panel" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div>
+        <div style="font-size:19px;font-weight:700;" id="cap-area-title"></div>
+        <div style="font-size:12px;color:#888;">Capture media · speak measurements</div>
+      </div>
+      <button class="btn btn-gray btn-sm" onclick="closeCapture()">✕</button>
+    </div>
+
+    <!-- Camera -->
+    <div class="card">
+      <div class="card-title">CAMERA</div>
+      <div class="camera-wrap" id="camera-wrap" style="display:none;">
+        <video id="camera-video" autoplay playsinline muted></video>
+        <div class="rec-indicator" id="rec-indicator"><div class="rec-dot"></div> REC</div>
+        <div class="camera-overlay">
+          <button class="cam-toggle" onclick="switchCamera()">🔄</button>
+          <div class="shutter" id="shutter" onclick="captureMedia()"></div>
+          <button class="cam-toggle" id="mode-toggle" onclick="toggleMode()">📷</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-dark btn-sm" style="flex:1;" onclick="startCamera('photo')">📷 Photo</button>
+        <button class="btn btn-red btn-sm" style="flex:1;" onclick="startCamera('video')">🎥 Video</button>
+        <button class="btn btn-gray btn-sm" onclick="stopCamera()" id="stop-cam-btn" style="display:none;">⏹ Stop</button>
+      </div>
+    </div>
+
+    <!-- Media strip -->
+    <div class="card" id="media-card" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="card-title" style="margin:0;">CAPTURED MEDIA</div>
+        <span style="font-size:11px;color:#888;">Tap to annotate</span>
+      </div>
+      <div class="media-strip" id="media-strip"></div>
+
+      <!-- Per-media voice memo -->
+      <div id="selected-media-panel" style="display:none;">
+        <div class="divider"></div>
+        <div class="section-label">SELECTED PHOTO ACTIONS</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" onclick="openDrawing()">✏️ Draw on Photo</button>
+          <button class="btn btn-outline btn-sm" id="voice-memo-btn" onclick="recordVoiceMemo()">🎤 Voice Memo</button>
+        </div>
+        <div id="voice-memos-list" class="voice-strip"></div>
+      </div>
+    </div>
+
+    <!-- Measurements -->
+    <div class="card">
+      <div class="card-title">MEASUREMENTS</div>
+      <button class="btn btn-red btn-full" id="meas-voice-btn" onclick="toggleMeasVoice()" style="margin-bottom:8px;">
+        🎤 Speak Measurements
+      </button>
+      <div class="hint" style="margin-bottom:10px;">"Ceiling 20x20, wall height 14, lengths 12 7 9 5"</div>
+      <div id="meas-transcript" style="display:none;background:#f8f8f8;border-radius:8px;padding:10px;font-size:14px;min-height:48px;margin-bottom:8px;"></div>
+      <textarea id="meas-text" rows="4" placeholder="Or type: Ceiling 20x20&#10;Wall height 14ft&#10;Lengths 12 7 9 5&#10;Next section..."></textarea>
+      <button class="btn btn-dark btn-full" onclick="parseMeas()" style="margin-top:8px;">Parse with AI →</button>
+      <div id="meas-loading" class="loading" style="display:none;"><div class="spinner"></div>Parsing measurements...</div>
+      <div id="meas-result" style="display:none;"></div>
+    </div>
+
+    <!-- Notes -->
+    <div class="card">
+      <div class="card-title">NOTES FOR OFFICE & CREW</div>
+      <button class="btn btn-red btn-full" id="notes-btn" onclick="recordNotes()" style="margin-bottom:8px;">🎤 Speak Notes</button>
+      <textarea id="notes-text" rows="3" placeholder="Access point, obstacles, protect floors, moisture issues, anything crew needs to know..."></textarea>
+    </div>
+
+    <button class="btn btn-green" onclick="saveArea()" style="margin-bottom:8px;">✓ Save This Area</button>
+  </div>
+
+  <div id="no-area-hint" style="text-align:center;padding:32px 16px;color:#888;">
+    <div style="font-size:36px;margin-bottom:10px;">☝️</div>
+    <div style="font-size:15px;font-weight:500;">Select an area to begin</div>
+    <div style="font-size:13px;margin-top:6px;">Tap any area above</div>
+  </div>
+</div>
+
+<!-- ═══ AREAS ═══ -->
+<div class="screen" id="screen-areas">
+  <div id="areas-empty" class="empty-state"><div class="icon">📋</div><p>No areas captured yet</p></div>
+  <div id="areas-list"></div>
+</div>
+
+<!-- ═══ WORKSHEET ═══ -->
+<div class="screen" id="screen-worksheet">
+  <div style="font-size:15px;font-weight:600;margin-bottom:4px;">Worksheet Preview</div>
+  <div style="font-size:13px;color:#888;margin-bottom:14px;">Keep or remove each section before sending to estimate.</div>
+  <div id="ws-empty" class="empty-state"><div class="icon">📊</div><p>Complete inspection first</p></div>
+  <div id="ws-list"></div>
+  <div id="ws-send" style="display:none;margin-top:4px;">
+    <button class="btn btn-green" onclick="sendToWorksheet()">✓ Send to Estimate Worksheet</button>
+    <div style="font-size:12px;color:#888;text-align:center;margin-top:6px;">Only kept sections will be sent</div>
+  </div>
+</div>
+
+<!-- ═══ DRAWING OVERLAY ═══ -->
+<div class="draw-overlay" id="draw-overlay">
+  <div class="draw-header">
+    <h2>Annotate Photo</h2>
+    <div class="draw-tools">
+      <button class="tool-btn active" id="tool-pen" onclick="setTool('pen')" title="Draw">✏️</button>
+      <button class="tool-btn" id="tool-arrow" onclick="setTool('arrow')" title="Arrow">➡️</button>
+      <button class="tool-btn" id="tool-text" onclick="setTool('text')" title="Text">T</button>
+      <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')" title="Erase">🧹</button>
+      <button class="tool-btn" onclick="undoDrawing()" title="Undo">↩️</button>
+      <button class="tool-btn" onclick="clearDrawing()" title="Clear">🗑️</button>
+    </div>
+  </div>
+  <div class="draw-canvas-wrap" id="draw-canvas-wrap">
+    <img id="draw-bg" src="" alt=""/>
+    <canvas id="draw-canvas"></canvas>
+  </div>
+  <div class="draw-bottom">
+    <div class="color-btn active" style="background:#ff3b30;" onclick="setColor('#ff3b30',this)"></div>
+    <div class="color-btn" style="background:#ffcc00;" onclick="setColor('#ffcc00',this)"></div>
+    <div class="color-btn" style="background:#34c759;" onclick="setColor('#34c759',this)"></div>
+    <div class="color-btn" style="background:#007aff;" onclick="setColor('#007aff',this)"></div>
+    <div class="color-btn" style="background:#ffffff;border:1px solid #555;" onclick="setColor('#ffffff',this)"></div>
+    <input type="range" class="stroke-slider" min="2" max="20" value="4" id="stroke-size"/>
+    <button class="btn btn-gray btn-sm" onclick="saveDrawing()">Save</button>
+    <button class="btn btn-gray btn-sm" onclick="closeDrawing()">Cancel</button>
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────
+const AREAS_DEF = [
+  {id:'basement',label:'Basement',icon:'🏚️'},
+  {id:'attic',label:'Attic',icon:'🏠'},
+  {id:'crawl',label:'Crawl Space',icon:'🕳️'},
+  {id:'pole-barn',label:'Pole Barn',icon:'🏗️'},
+  {id:'garage',label:'Garage',icon:'🚗'},
+  {id:'rim-joist',label:'Rim Joist',icon:'🔩'},
+  {id:'retrofoam',label:'RetroFoam',icon:'💉'},
+  {id:'other',label:'Other',icon:'📍'},
+];
+
+let currentArea = null;
+let capturedAreas = {};
+let mediaItems = []; // [{id, type:'photo'|'video', src, thumbnail, voiceMemos:[], drawingDataUrl, drawingStrokes:[]}]
+let selectedMediaIdx = -1;
+let cameraStream = null;
+let cameraMode = 'photo';
+let facingMode = 'environment';
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecordingVideo = false;
+let isMeasVoice = false;
+let isNotesVoice = false;
+let measRecognition = null;
+let notesRecognition = null;
+let voiceMemoRecognition = null;
+let isVoiceMemo = false;
+
+// Drawing state
+let drawTool = 'pen';
+let drawColor = '#ff3b30';
+let drawStrokeSize = 4;
+let drawStrokes = [];
+let currentStroke = null;
+let isDrawing = false;
+let drawingForMediaIdx = -1;
+
+document.getElementById('hdr-date').textContent = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+// ─── Area Grid ───────────────────────────────────────────────────────
+function renderAreaGrid() {
+  const grid = document.getElementById('area-grid');
+  grid.innerHTML = AREAS_DEF.map(a => {
+    const saved = capturedAreas[a.id];
+    return `<div class="area-btn ${saved?'done':''}" id="abtn-${a.id}" onclick="selectArea('${a.id}')">
+      <div class="icon">${a.icon}</div>
+      <div class="label">${a.label}</div>
+      <div class="status">${saved ? '✓ Saved' : 'Tap to capture'}</div>
+    </div>`;
+  }).join('');
+}
+renderAreaGrid();
+
+function selectArea(id) {
+  currentArea = id;
+  mediaItems = (capturedAreas[id]?.mediaItems) || [];
+  document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('abtn-'+id)?.classList.add('selected');
+  document.getElementById('capture-panel').style.display = 'block';
+  document.getElementById('no-area-hint').style.display = 'none';
+  const def = AREAS_DEF.find(a => a.id === id);
+  document.getElementById('cap-area-title').textContent = def.icon + ' ' + def.label;
+  document.getElementById('meas-text').value = capturedAreas[id]?.measText || '';
+  document.getElementById('notes-text').value = capturedAreas[id]?.notes || '';
+  document.getElementById('meas-result').style.display = capturedAreas[id]?.measHTML ? 'block' : 'none';
+  if (capturedAreas[id]?.measHTML) document.getElementById('meas-result').innerHTML = capturedAreas[id].measHTML;
+  renderMediaStrip();
+}
+
+function closeCapture() {
+  currentArea = null;
+  stopCamera();
+  document.querySelectorAll('.area-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('capture-panel').style.display = 'none';
+  document.getElementById('no-area-hint').style.display = 'block';
+}
+
+// ─── Camera ──────────────────────────────────────────────────────────
+async function startCamera(mode) {
+  cameraMode = mode;
+  document.getElementById('mode-toggle').textContent = mode === 'photo' ? '📷' : '🎥';
+  try {
+    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); }
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width:{ideal:1920}, height:{ideal:1080} },
+      audio: mode === 'video'
+    });
+    const vid = document.getElementById('camera-video');
+    vid.srcObject = cameraStream;
+    document.getElementById('camera-wrap').style.display = 'block';
+    document.getElementById('stop-cam-btn').style.display = 'inline-flex';
+  } catch(e) {
+    alert('Camera access denied. Please allow camera access in your browser settings.');
+  }
+}
+
+function stopCamera() {
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  if (mediaRecorder && isRecordingVideo) { mediaRecorder.stop(); }
+  document.getElementById('camera-wrap').style.display = 'none';
+  document.getElementById('stop-cam-btn').style.display = 'none';
+}
+
+function switchCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  startCamera(cameraMode);
+}
+
+function toggleMode() {
+  cameraMode = cameraMode === 'photo' ? 'video' : 'photo';
+  document.getElementById('mode-toggle').textContent = cameraMode === 'photo' ? '📷' : '🎥';
+  if (cameraStream) startCamera(cameraMode);
+}
+
+function captureMedia() {
+  if (cameraMode === 'photo') {
+    takePhoto();
+  } else {
+    if (isRecordingVideo) stopVideoRecording();
+    else startVideoRecording();
+  }
+}
+
+function takePhoto() {
+  const video = document.getElementById('camera-video');
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const src = canvas.toDataURL('image/jpeg', 0.85);
+  const id = 'photo-' + Date.now();
+  mediaItems.push({id, type:'photo', src, thumbnail:src, voiceMemos:[], drawingDataUrl:null, drawingStrokes:[]});
+  renderMediaStrip();
+  // Flash effect
+  const wrap = document.getElementById('camera-wrap');
+  wrap.style.filter = 'brightness(3)';
+  setTimeout(() => wrap.style.filter = '', 100);
+}
+
+function startVideoRecording() {
+  if (!cameraStream) return;
+  recordedChunks = [];
+  const options = {mimeType: 'video/webm;codecs=vp9'};
+  try { mediaRecorder = new MediaRecorder(cameraStream, options); }
+  catch(e) { mediaRecorder = new MediaRecorder(cameraStream); }
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, {type:'video/webm'});
+    const src = URL.createObjectURL(blob);
+    const id = 'video-' + Date.now();
+    // Thumbnail from first frame
+    const thumbVid = document.createElement('video');
+    thumbVid.src = src;
+    thumbVid.currentTime = 0.1;
+    thumbVid.onloadeddata = () => {
+      const c = document.createElement('canvas');
+      c.width = 144; c.height = 108;
+      c.getContext('2d').drawImage(thumbVid, 0, 0, 144, 108);
+      const thumb = c.toDataURL('image/jpeg', 0.7);
+      mediaItems.push({id, type:'video', src, thumbnail:thumb, voiceMemos:[], drawingDataUrl:null, drawingStrokes:[]});
+      renderMediaStrip();
+    };
+    thumbVid.load();
+    isRecordingVideo = false;
+    document.getElementById('shutter').classList.remove('recording');
+    document.getElementById('rec-indicator').style.display = 'none';
+  };
+  mediaRecorder.start();
+  isRecordingVideo = true;
+  document.getElementById('shutter').classList.add('recording');
+  document.getElementById('rec-indicator').style.display = 'flex';
+}
+
+function stopVideoRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+}
+
+// ─── Media Strip ─────────────────────────────────────────────────────
+function renderMediaStrip() {
+  const strip = document.getElementById('media-strip');
+  const card = document.getElementById('media-card');
+  if (mediaItems.length === 0) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  strip.innerHTML = mediaItems.map((m,i) => `
+    <div class="media-thumb ${selectedMediaIdx===i?'selected':''}" onclick="selectMedia(${i})">
+      <img src="${m.thumbnail}" alt=""/>
+      ${m.drawingDataUrl ? '<span class="has-drawing">✏️</span>' : ''}
+      ${m.voiceMemos.length > 0 ? '<span class="has-voice">🎤</span>' : ''}
+      <span class="type-badge">${m.type==='video'?'VID':'IMG'}</span>
+      <span class="del" onclick="event.stopPropagation();deleteMedia(${i})">×</span>
+    </div>
+  `).join('');
+}
+
+function selectMedia(idx) {
+  selectedMediaIdx = idx;
+  renderMediaStrip();
+  document.getElementById('selected-media-panel').style.display = 'block';
+  const m = mediaItems[idx];
+  const memosList = document.getElementById('voice-memos-list');
+  memosList.innerHTML = m.voiceMemos.map((v,i) => `
+    <div class="voice-chip" onclick="playVoiceMemo(${idx},${i})">
+      🎤 Memo ${i+1} <span style="color:#888;font-size:10px;">${v.duration||''}</span>
+    </div>
+  `).join('');
+}
+
+function deleteMedia(idx) {
+  mediaItems.splice(idx, 1);
+  selectedMediaIdx = -1;
+  document.getElementById('selected-media-panel').style.display = 'none';
+  renderMediaStrip();
+}
+
+// ─── Voice Memo for Photo ─────────────────────────────────────────────
+function recordVoiceMemo() {
+  if (selectedMediaIdx < 0) return;
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Voice not supported. Use Chrome or Safari.');
+    return;
+  }
+  if (isVoiceMemo) {
+    voiceMemoRecognition && voiceMemoRecognition.stop();
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  voiceMemoRecognition = new SR();
+  voiceMemoRecognition.continuous = true;
+  voiceMemoRecognition.interimResults = false;
+  let transcript = '';
+  const startTime = Date.now();
+  voiceMemoRecognition.onstart = () => {
+    isVoiceMemo = true;
+    document.getElementById('voice-memo-btn').textContent = '⏹ Stop Memo';
+    document.getElementById('voice-memo-btn').style.background = '#e63946';
+    document.getElementById('voice-memo-btn').style.color = 'white';
+  };
+  voiceMemoRecognition.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) transcript += e.results[i][0].transcript + ' ';
+    }
+  };
+  voiceMemoRecognition.onend = () => {
+    isVoiceMemo = false;
+    document.getElementById('voice-memo-btn').textContent = '🎤 Voice Memo';
+    document.getElementById('voice-memo-btn').style.background = '';
+    document.getElementById('voice-memo-btn').style.color = '';
+    if (transcript.trim()) {
+      const secs = Math.round((Date.now()-startTime)/1000);
+      mediaItems[selectedMediaIdx].voiceMemos.push({
+        text: transcript.trim(),
+        duration: secs + 's'
+      });
+      selectMedia(selectedMediaIdx);
+      renderMediaStrip();
+    }
+  };
+  voiceMemoRecognition.start();
+}
+
+function playVoiceMemo(mediaIdx, memoIdx) {
+  const memo = mediaItems[mediaIdx].voiceMemos[memoIdx];
+  alert('Voice memo:\n\n"' + memo.text + '"');
+}
+
+// ─── Drawing ─────────────────────────────────────────────────────────
+function openDrawing() {
+  if (selectedMediaIdx < 0) return;
+  const m = mediaItems[selectedMediaIdx];
+  if (m.type !== 'photo') { alert('Drawing is only available on photos.'); return; }
+  drawingForMediaIdx = selectedMediaIdx;
+  drawStrokes = [...(m.drawingStrokes || [])];
+  const overlay = document.getElementById('draw-overlay');
+  const bg = document.getElementById('draw-bg');
+  bg.src = m.drawingDataUrl || m.src;
+  overlay.classList.add('active');
+  setTimeout(initDrawCanvas, 100);
+}
+
+function initDrawCanvas() {
+  const wrap = document.getElementById('draw-canvas-wrap');
+  const canvas = document.getElementById('draw-canvas');
+  canvas.width = wrap.offsetWidth;
+  canvas.height = wrap.offsetHeight;
+  redrawStrokes();
+}
+
+function closeDrawing() {
+  document.getElementById('draw-overlay').classList.remove('active');
+}
+
+function saveDrawing() {
+  const canvas = document.getElementById('draw-canvas');
+  const bg = document.getElementById('draw-bg');
+  const merged = document.createElement('canvas');
+  merged.width = bg.naturalWidth || canvas.width;
+  merged.height = bg.naturalHeight || canvas.height;
+  const ctx = merged.getContext('2d');
+  ctx.drawImage(bg, 0, 0, merged.width, merged.height);
+  const scaleX = merged.width / canvas.width;
+  const scaleY = merged.height / canvas.height;
+  ctx.save();
+  ctx.scale(scaleX, scaleY);
+  ctx.drawImage(canvas, 0, 0);
+  ctx.restore();
+  const dataUrl = merged.toDataURL('image/jpeg', 0.9);
+  mediaItems[drawingForMediaIdx].drawingDataUrl = dataUrl;
+  mediaItems[drawingForMediaIdx].drawingStrokes = [...drawStrokes];
+  mediaItems[drawingForMediaIdx].thumbnail = dataUrl;
+  renderMediaStrip();
+  closeDrawing();
+}
+
+function setTool(t) {
+  drawTool = t;
+  document.querySelectorAll('.tool-btn[id^=tool-]').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('tool-'+t);
+  if (el) el.classList.add('active');
+}
+
+function setColor(c, el) {
+  drawColor = c;
+  document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function redrawStrokes() {
+  const canvas = document.getElementById('draw-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawStrokes.forEach(s => {
+    if (s.type === 'pen') {
+      ctx.beginPath();
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = s.size;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      s.points.forEach((p,i) => i === 0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+      ctx.stroke();
+    } else if (s.type === 'arrow') {
+      drawArrow(ctx, s.x1, s.y1, s.x2, s.y2, s.color, s.size);
+    } else if (s.type === 'text') {
+      ctx.fillStyle = s.color;
+      ctx.font = `${s.size*4}px -apple-system,sans-serif`;
+      ctx.fillText(s.text, s.x, s.y);
+    }
+  });
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color, size) {
+  const headlen = size * 4;
+  const angle = Math.atan2(y2-y1, x2-x1);
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = size;
+  ctx.lineCap = 'round';
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2-headlen*Math.cos(angle-Math.PI/6), y2-headlen*Math.sin(angle-Math.PI/6));
+  ctx.lineTo(x2-headlen*Math.cos(angle+Math.PI/6), y2-headlen*Math.sin(angle+Math.PI/6));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function undoDrawing() {
+  drawStrokes.pop();
+  redrawStrokes();
+}
+
+function clearDrawing() {
+  drawStrokes = [];
+  redrawStrokes();
+}
+
+// Canvas touch/mouse events
+const dc = document.getElementById('draw-canvas');
+let arrowStart = null;
+
+function getPos(e) {
+  const rect = dc.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+}
+
+dc.addEventListener('touchstart', e => { e.preventDefault(); onDrawStart(getPos(e)); }, {passive:false});
+dc.addEventListener('mousedown', e => onDrawStart(getPos(e)));
+dc.addEventListener('touchmove', e => { e.preventDefault(); onDrawMove(getPos(e)); }, {passive:false});
+dc.addEventListener('mousemove', e => { if (isDrawing) onDrawMove(getPos(e)); });
+dc.addEventListener('touchend', e => { e.preventDefault(); onDrawEnd(getPos(e.changedTouches[0] || e)); }, {passive:false});
+dc.addEventListener('mouseup', e => onDrawEnd(getPos(e)));
+
+function onDrawStart(pos) {
+  isDrawing = true;
+  if (drawTool === 'pen' || drawTool === 'eraser') {
+    currentStroke = { type:'pen', color: drawTool==='eraser'?'rgba(0,0,0,0)':'rgba(0,0,0,0)', points:[pos], size: drawTool==='eraser'?parseInt(document.getElementById('stroke-size').value)*3:parseInt(document.getElementById('stroke-size').value) };
+    if (drawTool === 'pen') currentStroke.color = drawColor;
+    if (drawTool === 'eraser') {
+      const ctx = dc.getContext('2d');
+      ctx.globalCompositeOperation = 'destination-out';
+      currentStroke._erase = true;
+    }
+  } else if (drawTool === 'arrow') {
+    arrowStart = pos;
+  } else if (drawTool === 'text') {
+    const text = prompt('Enter text:');
+    if (text) {
+      drawStrokes.push({type:'text', text, x:pos.x, y:pos.y, color:drawColor, size:parseInt(document.getElementById('stroke-size').value)});
+      redrawStrokes();
+    }
+    isDrawing = false;
+  }
+}
+
+function onDrawMove(pos) {
+  if (!isDrawing) return;
+  const ctx = dc.getContext('2d');
+  if (drawTool === 'pen') {
+    currentStroke.points.push(pos);
+    ctx.beginPath();
+    const pts = currentStroke.points;
+    ctx.strokeStyle = currentStroke.color;
+    ctx.lineWidth = currentStroke.size;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalCompositeOperation = 'source-over';
+    if (pts.length >= 2) {
+      ctx.moveTo(pts[pts.length-2].x, pts[pts.length-2].y);
+      ctx.lineTo(pts[pts.length-1].x, pts[pts.length-1].y);
+      ctx.stroke();
+    }
+  } else if (drawTool === 'eraser') {
+    currentStroke.points.push(pos);
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    const pts = currentStroke.points;
+    ctx.lineWidth = parseInt(document.getElementById('stroke-size').value) * 3;
+    ctx.lineCap = 'round';
+    if (pts.length >= 2) {
+      ctx.moveTo(pts[pts.length-2].x, pts[pts.length-2].y);
+      ctx.lineTo(pts[pts.length-1].x, pts[pts.length-1].y);
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  } else if (drawTool === 'arrow' && arrowStart) {
+    redrawStrokes();
+    drawArrow(ctx, arrowStart.x, arrowStart.y, pos.x, pos.y, drawColor, parseInt(document.getElementById('stroke-size').value));
+  }
+}
+
+function onDrawEnd(pos) {
+  if (!isDrawing) return;
+  isDrawing = false;
+  const ctx = dc.getContext('2d');
+  ctx.globalCompositeOperation = 'source-over';
+  if (drawTool === 'pen' && currentStroke) {
+    drawStrokes.push(currentStroke);
+    currentStroke = null;
+  } else if (drawTool === 'eraser' && currentStroke) {
+    drawStrokes.push({...currentStroke, _erase:true});
+    currentStroke = null;
+  } else if (drawTool === 'arrow' && arrowStart) {
+    drawStrokes.push({type:'arrow', x1:arrowStart.x, y1:arrowStart.y, x2:pos.x, y2:pos.y, color:drawColor, size:parseInt(document.getElementById('stroke-size').value)});
+    arrowStart = null;
+    redrawStrokes();
+  }
+}
+
+// ─── Measurement Voice ────────────────────────────────────────────────
+function toggleMeasVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Voice not supported. Please type measurements.');
+    return;
+  }
+  if (isMeasVoice) { measRecognition && measRecognition.stop(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  measRecognition = new SR();
+  measRecognition.continuous = true;
+  measRecognition.interimResults = true;
+  let final = '';
+  measRecognition.onstart = () => {
+    isMeasVoice = true;
+    document.getElementById('meas-voice-btn').textContent = '⏹ Stop Recording';
+    document.getElementById('meas-transcript').style.display = 'block';
+  };
+  measRecognition.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript + ' ';
+      else interim = e.results[i][0].transcript;
+    }
+    document.getElementById('meas-transcript').textContent = final + interim;
+    document.getElementById('meas-text').value = final + interim;
+  };
+  measRecognition.onend = () => {
+    isMeasVoice = false;
+    document.getElementById('meas-voice-btn').textContent = '🎤 Speak Measurements';
+  };
+  measRecognition.start();
+}
+
+function recordNotes() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Voice not supported. Please type notes.'); return;
+  }
+  if (isNotesVoice) { notesRecognition && notesRecognition.stop(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  notesRecognition = new SR();
+  notesRecognition.continuous = true;
+  notesRecognition.interimResults = false;
+  let noteFinal = '';
+  notesRecognition.onstart = () => {
+    isNotesVoice = true;
+    document.getElementById('notes-btn').textContent = '⏹ Stop';
+    document.getElementById('notes-btn').style.background = '#c1121f';
+  };
+  notesRecognition.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) noteFinal += e.results[i][0].transcript + ' ';
+    }
+  };
+  notesRecognition.onend = () => {
+    isNotesVoice = false;
+    document.getElementById('notes-btn').textContent = '🎤 Speak Notes';
+    document.getElementById('notes-btn').style.background = '#e63946';
+    const ex = document.getElementById('notes-text').value;
+    document.getElementById('notes-text').value = (ex ? ex + '\n' : '') + noteFinal.trim();
+  };
+  notesRecognition.start();
+}
+
+// ─── AI Parse ────────────────────────────────────────────────────────
+async function parseMeas() {
+  const text = document.getElementById('meas-text').value.trim();
+  if (!text) { alert('Enter or speak measurements first.'); return; }
+  const areaName = currentArea ? AREAS_DEF.find(a=>a.id===currentArea)?.label : 'Area';
+  document.getElementById('meas-loading').style.display = 'flex';
+  document.getElementById('meas-result').style.display = 'none';
+  try {
+    const prompt = `You are parsing spoken/typed measurements from a contractor doing a site inspection in the ${areaName}.
+
+Input: "${text}"
+
+Parse into structured measurements. Common patterns:
+- "ceiling 20x20" or "ceiling is 20 by 20" = ceiling 400 SF
+- "wall height 14" = wall height 14 ft
+- "lengths 12 7 9 5" or wall lengths after height = individual wall lengths in feet
+- "next section" = new measurement group
+- Calculate Wall SF = height × sum(lengths)
+- Calculate Ceiling SF = L × W
+
+Return ONLY clean HTML (no markdown, no code blocks):
+<div class="ai-result">
+<div class="ai-result-title">✓ AI Parsed — ${areaName}</div>
+<table class="meas-table">
+<thead><tr><th>Section</th><th>Type</th><th>Dimensions</th><th>SF</th></tr></thead>
+<tbody>[rows]</tbody>
+</table>
+[flags if any: <div class="flag">⚠ flag text</div>]
+<div style="margin-top:8px;font-size:12px;color:#555;">Total estimated SF: X</div>
+</div>`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    const data = await res.json();
+    const html = (data.content?.[0]?.text||'').replace(/```html/g,'').replace(/```/g,'').trim();
+    document.getElementById('meas-loading').style.display = 'none';
+    document.getElementById('meas-result').style.display = 'block';
+    document.getElementById('meas-result').innerHTML = html;
+    if (currentArea) {
+      if (!capturedAreas[currentArea]) capturedAreas[currentArea] = {};
+      capturedAreas[currentArea].measHTML = html;
+      capturedAreas[currentArea].measText = text;
+    }
+  } catch(e) {
+    document.getElementById('meas-loading').style.display = 'none';
+    alert('Could not reach AI. Check your connection.');
+  }
+}
+
+// ─── Save Area ────────────────────────────────────────────────────────
+function saveArea() {
+  if (!currentArea) return;
+  const def = AREAS_DEF.find(a => a.id === currentArea);
+  capturedAreas[currentArea] = {
+    ...(capturedAreas[currentArea] || {}),
+    id: currentArea,
+    label: def.label,
+    icon: def.icon,
+    mediaItems: [...mediaItems],
+    notes: document.getElementById('notes-text').value,
+    measText: document.getElementById('meas-text').value,
+    measHTML: document.getElementById('meas-result').innerHTML || '',
+    keep: true,
+    savedAt: new Date().toLocaleTimeString(),
+  };
+  renderAreaGrid();
+  closeCapture();
+  showTab('areas');
+}
+
+// ─── Areas Tab ────────────────────────────────────────────────────────
+function renderAreas() {
+  const list = document.getElementById('areas-list');
+  const empty = document.getElementById('areas-empty');
+  const keys = Object.keys(capturedAreas);
+  if (keys.length === 0) { empty.style.display='block'; list.innerHTML=''; return; }
+  empty.style.display='none';
+  list.innerHTML = keys.map(k => {
+    const d = capturedAreas[k];
+    const photoCnt = d.mediaItems?.filter(m=>m.type==='photo').length || 0;
+    const vidCnt = d.mediaItems?.filter(m=>m.type==='video').length || 0;
+    const voiceCnt = d.mediaItems?.reduce((a,m)=>a+m.voiceMemos.length,0) || 0;
+    const drawCnt = d.mediaItems?.filter(m=>m.drawingDataUrl).length || 0;
+    return `<div class="area-item">
+      <div class="area-item-hdr">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">${d.icon}</span>
+          <div>
+            <div style="font-size:15px;font-weight:600;">${d.label}</div>
+            <div style="font-size:12px;color:#888;">
+              ${photoCnt > 0 ? photoCnt+'📷 ' : ''}${vidCnt > 0 ? vidCnt+'🎥 ' : ''}${voiceCnt > 0 ? voiceCnt+'🎤 ' : ''}${drawCnt > 0 ? drawCnt+' annotated ' : ''}· ${d.savedAt}
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-gray btn-sm" onclick="editArea('${k}')">Edit</button>
+      </div>
+      ${d.mediaItems?.length > 0 ? `<div style="display:flex;gap:6px;overflow-x:auto;padding:0 14px 12px;-webkit-overflow-scrolling:touch;">
+        ${d.mediaItems.map(m=>`<img src="${m.drawingDataUrl||m.thumbnail}" style="width:60px;height:60px;border-radius:6px;object-fit:cover;flex-shrink:0;" />`).join('')}
+      </div>` : ''}
+      ${d.measHTML ? `<div style="padding:0 14px 12px;">${d.measHTML}</div>` : ''}
+      ${d.notes ? `<div style="padding:8px 14px;font-size:13px;background:#fffbf0;border-top:1px solid #f0e8d0;color:#555;">📝 ${d.notes}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function editArea(id) {
+  showTab('capture');
+  selectArea(id);
+}
+
+// ─── Worksheet Tab ────────────────────────────────────────────────────
+function renderWorksheet() {
+  const list = document.getElementById('ws-list');
+  const empty = document.getElementById('ws-empty');
+  const send = document.getElementById('ws-send');
+  const keys = Object.keys(capturedAreas);
+  if (keys.length === 0) { empty.style.display='block'; list.innerHTML=''; send.style.display='none'; return; }
+  empty.style.display='none';
+  send.style.display='block';
+  list.innerHTML = keys.map(k => {
+    const d = capturedAreas[k];
+    const isKeep = d.keep !== false;
+    const photoCnt = d.mediaItems?.length || 0;
+    return `<div class="ws-section">
+      <div class="ws-hdr">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">${d.icon}</span>
+          <div>
+            <div style="font-size:15px;font-weight:600;">${d.label}</div>
+            <div style="font-size:12px;color:#888;">${photoCnt} media item(s) · ${d.notes?'Has notes':'No notes'}</div>
+          </div>
+        </div>
+        <span style="font-size:10px;background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:99px;font-weight:500;">From inspection</span>
+      </div>
+      <div class="ws-body">
+        ${d.measHTML || '<div style="color:#888;font-size:13px;">No measurements — will need manual entry</div>'}
+        <div class="toggle-row">
+          <button class="tog-btn ${isKeep?'keep':''}" onclick="toggleKeep('${k}','keep',this)">✓ Keep</button>
+          <button class="tog-btn ${!isKeep?'remove':''}" onclick="toggleKeep('${k}','remove',this)">✕ Remove</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleKeep(area, action, btn) {
+  capturedAreas[area].keep = action === 'keep';
+  btn.closest('.toggle-row').querySelectorAll('.tog-btn').forEach(b => b.classList.remove('keep','remove'));
+  if (action === 'keep') btn.closest('.toggle-row').children[0].classList.add('keep');
+  else btn.closest('.toggle-row').children[1].classList.add('remove');
+}
+
+function sendToWorksheet() {
+  const kept = Object.values(capturedAreas).filter(a => a.keep !== false);
+  if (!kept.length) { alert('Keep at least one section.'); return; }
+  const lines = kept.map(a => {
+    const photoCnt = a.mediaItems?.length || 0;
+    return `${a.icon} ${a.label} — ${photoCnt} media, ${a.notes?'notes attached':'no notes'}`;
+  }).join('\n');
+  alert(`✓ Would send to Estimate Worksheet:\n\n${lines}\n\nIn InsulatePro, these sections would pre-populate the estimator with measurements, media, and notes already attached.`);
+}
+
+// ─── Tab switching ────────────────────────────────────────────────────
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['capture','areas','worksheet'][i] === tab);
+  });
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-'+tab).classList.add('active');
+  if (tab === 'areas') renderAreas();
+  if (tab === 'worksheet') renderWorksheet();
+}
+</script>
+</body>
+</html>
